@@ -30,4 +30,10 @@ library Errors {
 
     /// @notice Receiver address must match msg.sender to prevent share theft
     error IntuitionFeeProxy_ReceiverMismatch();
+
+    /// @notice Caller is not the fee recipient
+    error IntuitionFeeProxy_NotFeeRecipient();
+
+    /// @notice No fees available to withdraw
+    error IntuitionFeeProxy_NoFeesToWithdraw();
 }
