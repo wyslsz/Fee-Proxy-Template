@@ -27,4 +27,7 @@ library Errors {
 
     /// @notice Fee percentage exceeds maximum allowed (100%)
     error IntuitionFeeProxy_FeePercentageTooHigh();
+
+    /// @notice Receiver address must match msg.sender to prevent share theft
+    error IntuitionFeeProxy_ReceiverMismatch();
 }
