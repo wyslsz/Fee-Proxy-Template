@@ -26,6 +26,9 @@ contract IntuitionFeeProxy {
     /// @notice Address receiving collected fees
     address public feeRecipient;
 
+    /// @notice Accumulated fees pending withdrawal (replaces auto-forwarding)
+    uint256 public accumulatedFees;
+
     /// @notice Fixed fee per deposit operation in wei
     /// @dev Default: 0.1 TRUST = 10^17 wei
     uint256 public depositFixedFee;
@@ -50,6 +53,9 @@ contract IntuitionFeeProxy {
 
     /// @notice Emitted when admin whitelist status is updated
     event AdminWhitelistUpdated(address indexed admin, bool status);
+
+    /// @notice Emitted when accumulated fees are withdrawn
+    event FeesWithdrawn(address indexed recipient, uint256 amount);
 
     /// @notice Emitted when fees are collected
     event FeesCollected(
@@ -426,6 +432,46 @@ contract IntuitionFeeProxy {
         return result;
     }
 
+    // ============ Withdraw Functions ============
+
+    function withdrawFees() external {
+        if (msg.sender != feeRecipient) {
+            revert Errors.IntuitionFeeProxy_NotFeeRecipient();
+        }
+        uint256 amount = accumulatedFees;
+        if (amount == 0) {
+            revert Errors.IntuitionFeeProxy_NoFeesToWithdraw();
+        }
+        accumulatedFees = 0;
+        (bool success, ) = feeRecipient.call{value: amount}("");
+        if (!success) {
+            accumulatedFees = amount;
+            revert Errors.IntuitionFeeProxy_TransferFailed();
+        }
+        emit FeesWithdrawn(feeRecipient, amount);
+    }
+
+    function withdrawFeesTo(address to) external onlyWhitelistedAdmin {
+        if (to == address(0)) {
+            revert Errors.IntuitionFeeProxy_ZeroAddress();
+        }
+        uint256 amount = accumulatedFees;
+        if (amount == 0) {
+            revert Errors.IntuitionFeeProxy_NoFeesToWithdraw();
+        }
+        accumulatedFees = 0;
+        (bool success, ) = to.call{value: amount}("");
+        if (!success) {
+            accumulatedFees = amount;
+            revert Errors.IntuitionFeeProxy_TransferFailed();
+        }
+        emit FeesWithdrawn(to, amount);
+    }
+
+    function getAccumulatedFees() external view returns (uint256) {
+        return accumulatedFees;
+    }
+
     // ============ View Functions (Passthrough) ============
 
     /// @notice Get atom creation cost from MultiVault
@@ -488,10 +534,7 @@ contract IntuitionFeeProxy {
     /// @param amount Amount to transfer
     function _transferFee(uint256 amount) internal {
         if (amount > 0) {
-            (bool success, ) = feeRecipient.call{value: amount}("");
-            if (!success) {
-                revert Errors.IntuitionFeeProxy_TransferFailed();
-            }
+            accumulatedFees += amount;
         }
     }
 
